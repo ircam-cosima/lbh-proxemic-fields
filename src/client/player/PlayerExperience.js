@@ -105,9 +105,7 @@ export default class PlayerExperience extends soundworks.Experience {
       24: 'sounds/attente-' + suffix + '.mp3',
       25: 'sounds/go-studio-1-' + suffix + '.mp3',
     }
-    console.log('before', this.audioFiles.length, this.loader)
     this.loader.loadFiles(audioFilesLanguage).then( () => { 
-      console.log('after', this.loader)
       this.hasLoadedLanguageAudio = true;
       // define new route names
       let offset = this.audioFiles.length;

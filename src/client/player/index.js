@@ -32,7 +32,6 @@ const files = [
 // define audio file route map
 const routeMap = new Map();
 const undefinedSoundId = files.length - 1; // debug error sound
-const language offset = 
 for (let i = 0; i < 4; i++){
   routeMap.set('swipeDown_set'+i, i);
   routeMap.set('swipeUp_set'+i, i+4);
