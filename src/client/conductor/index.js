@@ -1,20 +1,23 @@
 import * as soundworks from 'soundworks/client';
-import viewTemplates from '../shared/viewTemplates';
-import viewContent from '../shared/viewContent';
+import serviceViews from '../shared/serviceViews';
 
-window.addEventListener('load', () => {
-  // configuration received from the server through the `index.html`
+function bootstrap() {
+  // initialize the client with configuration received
+  // from the server through the `index.html`
   // @see {~/src/server/index.js}
   // @see {~/html/default.ejs}
-  const { appName, clientType, socketIO }  = window.soundworksConfig;
-  // initialize the 'player' client
-  soundworks.client.init(clientType, { socketIO, appName });
-  soundworks.client.setViewContentDefinitions(viewContent);
-  soundworks.client.setViewTemplateDefinitions(viewTemplates);
+  const config = Object.assign({ appContainer: '#container' }, window.soundworksConfig);
+  soundworks.client.init(config.clientType, config);
+
+  // configure views for the services
+  soundworks.client.setServiceInstanciationHook((id, instance) => {
+    if (serviceViews.has(id))
+      instance.view = serviceViews.get(id, config);
+  });
 
   // configure appearance of shared parameters
   let defaultSliderSize = 'medium';
-  const conductor = new soundworks.BasicSharedController({
+  const conductor = new soundworks.ControllerExperience({
     numPlayers: { readOnly: true },
     
     setLocPlayer0: { type: 'buttons' },
@@ -64,4 +67,6 @@ window.addEventListener('load', () => {
 
   // start client
   soundworks.client.start();
-});
+}
+
+window.addEventListener('load', bootstrap);

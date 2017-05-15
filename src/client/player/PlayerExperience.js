@@ -7,18 +7,15 @@ const audioContext = soundworks.audioContext;
 const client = soundworks.client;
 const SWIPE_LVL = 0.4;
 
-// const  colorList = [ '#e54444', '#798edd', '#fdd75f', '#5dd28e', '#a9b8c1' ];
-// const  colorList = [ '#2f8f75', '#ef6d38', '#385b9f', '#dddad6', '#f9f1b5' ];
-// const  colorList = [ '#003b6f', '#ff4040', '#ff0066', '#ff9900', '#4dff4d', '#e6e600' ];
-const  colorList = [ '#14435b', '#e7d174', '#b0d0b2', '#f79b2e', '#a9b8c1' ];
-const  bkgColorList = [ '#e54444', '#798edd', '#fdd75f', '#c2752d'];
+const colorList = [ '#14435b', '#e7d174', '#b0d0b2', '#f79b2e', '#a9b8c1' ];
+const bkgColorList = [ '#e54444', '#798edd', '#fdd75f', '#c2752d'];
 const fadeInOutDuration = 3.0;
 
 const viewTemplate = `
   <canvas class="background"></canvas>
   <div class="foreground">
     <div class="huger section-top flex-center"> 
-      <p class="huger" id="clientId" align="center"> <%=clientID%> </p> 
+      <p class="huger" id="clientId" align="center"> <%= clientID %> </p> 
     </div>
     <div class="section-center flex-center">
       <!--
@@ -33,6 +30,8 @@ const viewTemplate = `
   </div>
 `;
 
+const model = { clientID: client.index };
+
 // this experience plays a sound when it starts, and plays another sound when
 // other clients join the experience
 export default class PlayerExperience extends soundworks.Experience {
@@ -46,9 +45,9 @@ export default class PlayerExperience extends soundworks.Experience {
     this.params = this.require('shared-params');
     this.motionInput = this.require('motion-input', { descriptors: ['accelerationIncludingGravity', 'deviceorientation'] });
     this.language = this.require('language', {options: {en: 'English', fr:'Français'} });
-    this.loader = this.require('loader', {
-      assetsDomain: assetsDomain,
+    this.loader = this.require('audio-buffer-manager', {
       files: audioFiles,
+      assetsDomain: assetsDomain,
     });
 
     // binding
@@ -78,15 +77,6 @@ export default class PlayerExperience extends soundworks.Experience {
     this.hasLoadedLanguageAudio = false;
   }
 
-  init() {
-    // initialize the view
-    this.viewTemplate = viewTemplate;
-    this.viewContent = { clientID: `` + client.index };
-    this.viewCtor = soundworks.CanvasView;
-    this.viewOptions = { preservePixelRatio: true };
-    this.view = this.createView();
-  }
-
   // mecanism added to avoid starting the experiment while loading language files (loaded independently of other sounds to limit 
   // final load: simply loads the required language  file)
   waitUntilLoadedAudioFiles() {
@@ -100,16 +90,24 @@ export default class PlayerExperience extends soundworks.Experience {
   start() {
     super.start(); // don't forget this
 
+    // initialize the view
+    this.view = new soundworks.CanvasView(viewTemplate, model, {}, {
+      id: this.id,
+      preservePixelRatio: true,
+    });  
+
     // load language specific audio files
     let suffix = 'EN';
     if( client.language === 'fr'){ suffix = 'FR'; }
-    let audioFilesLanguage = [
-      'sounds/speech-hall-' + suffix + '.mp3',
-      'sounds/speech-studio-' + suffix + '.mp3',
-      'sounds/attente-' + suffix + '.mp3',
-      'sounds/go-studio-1-' + suffix + '.mp3'
-    ]
-    this.loader.load(audioFilesLanguage).then( () => { 
+    let audioFilesLanguage = {
+      22: 'sounds/speech-hall-' + suffix + '.mp3',
+      23: 'sounds/speech-studio-' + suffix + '.mp3',
+      24: 'sounds/attente-' + suffix + '.mp3',
+      25: 'sounds/go-studio-1-' + suffix + '.mp3',
+    }
+    console.log('before', this.audioFiles.length, this.loader)
+    this.loader.loadFiles(audioFilesLanguage).then( () => { 
+      console.log('after', this.loader)
       this.hasLoadedLanguageAudio = true;
       // define new route names
       let offset = this.audioFiles.length;
@@ -119,69 +117,67 @@ export default class PlayerExperience extends soundworks.Experience {
       this.bufferRouteMap.set('invite', offset + 3);
 
     }); /* remove waiting interface)*/
-    this.waitUntilLoadedAudioFiles();
 
-    if (!this.hasStarted) {
-      this.init();
-    }    
+    // as show can be async, we make sure that the view is actually rendered
+    this.show().then(() => {
+      this.waitUntilLoadedAudioFiles();
 
-    // initialize audio renderer
-    this.soundHandler = new Audio.SoundHandler( this );
+      // initialize audio renderer
+      this.soundHandler = new Audio.SoundHandler( this );
 
-    // triggered when device receives new sound Id from server: turn off current sound set and simply update soundSet Id
-    // restart is triggered later by player's input
-    this.receive('soundId', (clientId, value) => {
-      // discard if player not concerned
-      if( clientId !== client.index ){ return; }
-      // discard if no sound available (keep the same sound)
-      if( value > -1 ){
-        // stop current set
-        this.soundHandler.stopSet(client.index, 2.5);
-        // change local memory
-        this.player.soundId = value;
-      }
-      else{
-        console.warn('no more sounds vailable to switch with');
-        this.soundHandler.playSound( this.bufferRouteMap.get('error_loc0') );
-      }
+      // triggered when device receives new sound Id from server: turn off current sound set and simply update soundSet Id
+      // restart is triggered later by player's input
+      this.receive('soundId', (clientId, value) => {
+        // discard if player not concerned
+        if( clientId !== client.index ){ return; }
+        // discard if no sound available (keep the same sound)
+        if( value > -1 ){
+          // stop current set
+          this.soundHandler.stopSet(client.index, 2.5);
+          // change local memory
+          this.player.soundId = value;
+        }
+        else{
+          console.warn('no more sounds vailable to switch with');
+          this.soundHandler.playSound( this.bufferRouteMap.get('error_loc0') );
+        }
+      });
+
+       // change behavior based on location (location is set by conductor via server)
+       // location value 0 is hall, value 1 is studio 1
+      this.receive('locationId', (value) => {
+        // from hall to studio
+        if( this.player.locationId == 0 && value == 1 ){
+          // stop instruction sound
+          this.soundHandler.stopSound( this.bufferRouteMap.get('instruction1'), 2 );
+          // stop silence sound (e.g. when player enters studio 1 in silence mode)
+          this.soundHandler.stopSound( this.bufferRouteMap.get('silence'), 2);
+          // start new instruction sound
+          this.soundHandler.playSound( this.bufferRouteMap.get('instruction2'), false, 1.0, 1.0 );
+        }
+        // from studio to hall (should not happend)
+        if( this.player.locationId == 1 && value == 0 )
+          return;
+
+        // update local
+        this.player.locationId = value;
+      });
+
+      // // sounds triggered directly from controller
+      // this.params.addParamListener('playSound1', () => { 
+      //   this.soundHandler.playSound( this.bufferRouteMap.get('instruction1') );
+      // });
+      // this.params.addParamListener('playSound2', () => { 
+      //   this.soundHandler.playSound( this.bufferRouteMap.get('instruction2') );
+      // });    
+
     });
-
-     // change behavior based on location (location is set by conductor via server)
-     // location value 0 is hall, value 1 is studio 1
-    this.receive('locationId', (value) => {
-      // from hall to studio
-      if( this.player.locationId == 0 && value == 1 ){
-        // stop instruction sound
-        this.soundHandler.stopSound( this.bufferRouteMap.get('instruction1'), 2 );
-        // stop silence sound (e.g. when player enters studio 1 in silence mode)
-        this.soundHandler.stopSound( this.bufferRouteMap.get('silence'), 2);
-        // start new instruction sound
-        this.soundHandler.playSound( this.bufferRouteMap.get('instruction2'), false, 1.0, 1.0 );
-      }
-      // from studio to hall (should not happend)
-      if( this.player.locationId == 1 && value == 0 )
-        return;
-
-      // update local
-      this.player.locationId = value;
-    });
-
-    // // sounds triggered directly from controller
-    // this.params.addParamListener('playSound1', () => { 
-    //   this.soundHandler.playSound( this.bufferRouteMap.get('instruction1') );
-    // });
-    // this.params.addParamListener('playSound2', () => { 
-    //   this.soundHandler.playSound( this.bufferRouteMap.get('instruction2') );
-    // });    
-
   }
 
   // start, after language files loaded
   startBis(){
     this.initTouch();
     this.initMotion();
-
-    this.show();
 
     // disable text selection, magnifier, and screen move on swipe on iOS
     document.getElementsByTagName("body")[0].addEventListener("touchstart",

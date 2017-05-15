@@ -362,7 +362,7 @@ export class AmbiSpat {
 
 export class AudioSource {
   constructor( soundworksExperience ) {
-    this.buffers = soundworksExperience.loader.buffers;
+    this.buffers = soundworksExperience.loader.data;
     this.sync = soundworksExperience.sync;
     this.time = {start: 0.0, timeInBuffer: 0.0};
     this.currentParams = {bufferId: -1, loop: false, playbackRate: 1.0};

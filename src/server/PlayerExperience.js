@@ -14,6 +14,7 @@ export default class PlayerExperience extends Experience {
     this.params = this.require('shared-params');
     this.osc = this.require('osc');
     this.sync = this.require('sync');
+    this.audioBufferManager = this.require('audio-buffer-manager');
 
     // binding
     this.gestureCallback = this.gestureCallback.bind(this);

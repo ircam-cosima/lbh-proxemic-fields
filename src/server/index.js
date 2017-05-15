@@ -54,7 +54,7 @@ soundworks.server.setClientConfigDefinition((clientType, config, httpRequest) =>
 });
 
 // create server side conductor experience
-const conductor = new soundworks.BasicSharedController('conductor');
+const conductor = new soundworks.ControllerExperience('conductor');
 
 
 // create the experience
